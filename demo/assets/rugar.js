@@ -516,6 +516,9 @@
     // and it is the same Edge-Bake fallback the architecture already budgets for.
     assetEndpoint: null,
     arModes: 'webxr scene-viewer quick-look',
+    // true | false | 'auto'. Scene Viewer calls this "object blending". Verified on device:
+    // helps on a flagship, hurts on an entry-level phone.
+    sceneViewerOcclusion: 'auto',
     // 'model-viewer' = model-viewer owns the AR session (WebXR or Scene Viewer).
     // 'rugar'        = our own WebXR session with a locked floor (assets/rugar-xr.js).
     xrEngine: 'model-viewer',
@@ -528,6 +531,27 @@
   var els = {};
 
   var IS_MOBILE = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  /**
+   * Rough device tier. Not a benchmark — a cheap signal for choices that would otherwise be
+   * wrong for half the fleet.
+   *
+   * Device testing forced this: a Galaxy S22 Ultra wants occlusion ON (it fixed the rug
+   * rendering over furniture) while a Galaxy A17 is visibly better with it OFF — no depth
+   * sensor, weak compute, so ARCore's software depth costs frames and adds artefacts. One
+   * global default is wrong for one of them whichever way it is set.
+   *
+   * navigator.deviceMemory is bucketed by Chrome to {0.25,0.5,1,2,4,8}, so a 4 GB budget
+   * phone reports 4 and a 12 GB flagship reports 8. Core count alone does not separate them:
+   * budget SoCs ship eight weak cores.
+   */
+  function deviceTier() {
+    var mem = navigator.deviceMemory || 0;
+    var cores = navigator.hardwareConcurrency || 0;
+    if (mem && mem <= 4) return 'low';
+    if (!mem && cores && cores <= 4) return 'low';
+    return 'high';
+  }
 
   function activeSize() {
     return { width: CFG.width, length: CFG.length, shape: CFG.shape };
@@ -640,7 +664,10 @@
       // disappearing under it. The guard reads the params off OUR src URL, so carrying the
       // parameter here is the only way to opt back in. The S22 Ultra supports the ARCore
       // Depth API, so occlusion is genuinely available once it stops being suppressed.
-      u.searchParams.set('disable_occlusion', 'false');
+      var wantOccl = CFG.sceneViewerOcclusion === 'auto'
+        ? deviceTier() === 'high'
+        : !!CFG.sceneViewerOcclusion;
+      u.searchParams.set('disable_occlusion', wantOccl ? 'false' : 'true');
       state.hostedUrl = u.toString();
       if (els.mv) els.mv.setAttribute('src', state.hostedUrl);
       if (state.stats) state.stats.hostedUrl = state.hostedUrl;
@@ -961,6 +988,10 @@ var STAGE_W = 1600;
         'assembly time  ' + s.buildMs + ' ms\n' +
         'iOS AR path    ' + (s.iosPath || '') + '\n' +
         'AR modes       ' + CFG.arModes + '\n' +
+        'device tier   ' + deviceTier() + '  (mem ' + (navigator.deviceMemory || '?') +
+          'GB, cores ' + (navigator.hardwareConcurrency || '?') + ')\n' +
+        'SV occlusion   ' + (CFG.sceneViewerOcclusion === 'auto'
+          ? 'auto -> ' + (deviceTier() === 'high' ? 'on' : 'off') : String(CFG.sceneViewerOcclusion)) + '\n' +
         'Android engine ' + (CFG.xrEngine === 'rugar'
           ? 'RugAR custom session — floor locked, no occlusion yet' + (xrReady() ? ' (ready)' : ' (preparing)')
           : 'model-viewer (' + CFG.arModes.split(' ')[0] + ')') + '\n' +
@@ -1018,6 +1049,7 @@ var STAGE_W = 1600;
 
   window.RugAR = {
     version: VERSION,
+    tier: deviceTier,
     configure: configure,
     launch: launch,
     open: openHandoff,

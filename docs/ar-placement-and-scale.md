@@ -393,3 +393,39 @@ That argues for **routing by device capability rather than picking one Android p
 The honest read is that the floor lock is a **premium-device feature**. On hardware where
 ARCore itself is struggling, the right answer is not a better lock — it is handing the session
 to the platform's own optimised viewer and accepting what it gives.
+
+
+---
+
+## 11. Device-tier routing (A17 follow-up)
+
+Second A17 run, after the depth/local-floor/relock fixes: **Scene Viewer was faster, smoother
+and better overall — and best with "object blending" OFF.**
+
+That last detail matters, because the code was forcing blending ON. `disable_occlusion=false`
+was added to fix the S22 Ultra rendering the rug *over* furniture. On the A17 it is the wrong
+call: no depth sensor, weak compute, so ARCore's software depth costs frames and adds artefacts.
+**One global default is wrong for one of these phones whichever way it is set.**
+
+So both the AR path and the blending flag are now chosen by device tier:
+
+| | entry-level (A17) | capable (S22 Ultra) |
+|---|---|---|
+| Android path | Scene Viewer | RugAR session |
+| Scene Viewer blending | off | on |
+| Floor lock | not available | yes |
+
+Tier comes from `navigator.deviceMemory` (Chrome buckets it, so a 4 GB budget phone reports 4
+and a 12 GB flagship reports 8), falling back to core count. Core count alone cannot separate
+them — budget SoCs ship eight weak cores. Both can be overridden by hand in the demo for A/B.
+
+### What this means commercially
+
+**The floor lock is a premium-device feature.** On hardware where ARCore itself is struggling,
+the answer is not a better lock — it is handing the session to the platform's own optimised
+native viewer and accepting what it gives.
+
+That is worth establishing before the customer meeting. If RugStudio's shoppers skew toward
+budget Android, most of them will land on Scene Viewer, and the differentiator is the
+zero-onboarding catalogue coverage rather than placement quality. **Ask them for device-mix
+data from their analytics** — it changes what should be demoed and what should be promised.

@@ -65,13 +65,24 @@
 
       <span class="field-label" style="margin-top:16px;display:block">Android AR mode</span>
       <div class="seg">
-        <button class="seg-btn active" data-armode="rugar">RugAR &#183; floor lock</button>
+        <button class="seg-btn active" data-armode="auto">Auto</button>
+        <button class="seg-btn" data-armode="rugar">RugAR &#183; floor lock</button>
         <button class="seg-btn" data-armode="scene-viewer">Scene Viewer</button>
         <button class="seg-btn" data-armode="webxr">WebXR</button>
       </div>
-      <p class="seg-hint" id="mode-hint">RugAR runs our own session: it ranks floors by area,
-        locks the height, and never lets a drag change it. No occlusion yet. Scene Viewer has
-        occlusion but cannot lock. WebXR is the original path, for comparison.</p>
+      <p class="seg-hint" id="mode-hint">Auto picks by device: the floor lock needs headroom an
+        entry-level phone doesn't have, so weaker devices get Scene Viewer, which is a native app
+        and much faster there.</p>
+
+      <span class="field-label" style="margin-top:16px;display:block">Scene Viewer blending
+        <em style="font-style:normal;text-transform:none;letter-spacing:0">(occlusion)</em></span>
+      <div class="seg">
+        <button class="seg-btn active" data-blend="auto">Auto</button>
+        <button class="seg-btn" data-blend="on">On</button>
+        <button class="seg-btn" data-blend="off">Off</button>
+      </div>
+      <p class="seg-hint" id="blend-hint">Lets the rug pass under furniture &mdash; but on a phone
+        with no depth sensor it costs frames and adds artefacts. Auto follows the device tier.</p>
     </div>
 
     <!-- Populated when an AR session ends. This is the data to send back after testing. -->
@@ -189,7 +200,10 @@
       imageUrl: product.imageUrl,
       width: current.width, length: current.length, shape: current.shape,
       thickness: 0.25, sizes: SIZES, tenant: 'rugstudio-demo',
-      xrEngine: 'rugar',
+      // Auto by device tier — the floor lock is a premium-device feature.
+      xrEngine: (window.RugAR && RugAR.tier() === 'high') ? 'rugar' : 'model-viewer',
+      arModes: (window.RugAR && RugAR.tier() === 'high')
+        ? 'webxr scene-viewer quick-look' : 'scene-viewer webxr quick-look',
       // Publishes each generated GLB to a real URL. Without it Scene Viewer is unreachable,
       // because it cannot read a blob: URL from another app.
       assetEndpoint: '/api/asset'
@@ -220,6 +234,20 @@
     setTimeout(function () { btn.textContent = 'Copy diagnostics'; }, 1800);
   });
 
+  // Scene Viewer blending (occlusion). Verified on device: a flagship wants it on, an
+  // entry-level phone is visibly better without it.
+  document.querySelectorAll('.seg-btn[data-blend]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var v = b.dataset.blend;
+      document.querySelectorAll('.seg-btn[data-blend]').forEach(function (x) { x.classList.toggle('active', x === b); });
+      document.getElementById('blend-hint').textContent =
+        v === 'auto' ? 'Auto: ' + RugAR.tier() + ' tier -> blending ' + (RugAR.tier() === 'high' ? 'on.' : 'off.')
+        : v === 'on' ? 'Forced on. Rug passes under furniture; costs frames on weak devices.'
+                     : 'Forced off. Rug always draws on top, but smoother.';
+      RugAR.configure({ sceneViewerOcclusion: v === 'auto' ? 'auto' : (v === 'on') });
+    });
+  });
+
   // iOS AR engine switch. Reconfigures in place — no reload — so the phone keeps its scroll
   // position and the next tap goes straight into AR with the newly built payload.
   document.querySelectorAll('.seg-btn[data-usdz]').forEach(function (b) {
@@ -237,9 +265,13 @@
   document.querySelectorAll('.seg-btn[data-armode]').forEach(function (b) {
     b.addEventListener('click', function () {
       var mode = b.dataset.armode;
+      if (mode === 'auto') mode = RugAR.tier() === 'high' ? 'rugar' : 'scene-viewer';
       document.querySelectorAll('.seg-btn[data-armode]').forEach(function (x) { x.classList.toggle('active', x === b); });
       document.getElementById('mode-hint').textContent =
-        mode === 'rugar'
+        b.dataset.armode === 'auto'
+          ? 'Auto: this device reads as ' + RugAR.tier() + ' tier, so it gets ' +
+            (mode === 'rugar' ? 'the RugAR session with the floor lock.' : 'Scene Viewer for frame rate.')
+          : mode === 'rugar'
           ? 'RugAR: our own session. Scan the floor, tap to place, and the height is then fixed — drag and rotate cannot move it. No occlusion in this mode yet.'
           : mode === 'scene-viewer'
             ? "Scene Viewer: Google's AR app. Occlusion works (objects sit on the rug) but it will not lock the floor."
