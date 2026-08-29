@@ -338,3 +338,58 @@ or ~$33k/year at 5¢. A build of even $600k pays back in **twenty to ninety year
 It only becomes rational if the engine itself is the product, licensed across many customers at
 scale — a different company than the one being priced in `pricing-strategy.md`. For this deal:
 license it, or accept Quick Look's limits on iOS.
+
+---
+
+## 10. Entry-level Android: what the Galaxy A17 diagnostics showed
+
+First run on genuinely low-end hardware (Galaxy A17, Android 10, Chrome 149). The diagnostics
+blob earned its keep — it found three defects, two of them mine, that no amount of desktop
+testing would have surfaced.
+
+```json
+{"space":"local", "depth":"error: Depth sensing feature is not supported by the session.",
+ "planes":5, "chosenArea":5.09, "mappedArea":11.92, "tiltDeg":0, "floorY":-2.0183,
+ "corrections":64, "jumpsRejected":110, "fps":8}
+```
+
+**1. `getDepthInformation` was throwing every frame — and was never latched off.** On a device
+without depth-sensing this constructs, throws, catches and string-concatenates a DOMException
+once per view per frame, indefinitely. A self-inflicted performance fault dressed up as a
+device limitation. Now: `session.enabledFeatures` is consulted up front, and any failure
+disables depth permanently for the session.
+
+**2. `local-floor` was never actually requested.** The code called
+`requestReferenceSpace('local-floor')` and fell back on rejection — but the feature was absent
+from `optionalFeatures`, so it could never be granted and the fallback fired every time. The
+comment in the source even claimed it was requested. `space:"local"` in the diagnostics is the
+proof. Fixed in both request paths.
+
+**3. 110 rejections against 64 corrections — the rug had stopped tracking the floor.** The
+jump-rejection rule assumed disagreement is transient. Sustained disagreement is not an
+artefact; it is ARCore having genuinely re-estimated the floor, and refusing it forever strands
+the rug at a stale height. Now: continuous disagreement for longer than `RELOCK_MS` (2.5 s) is
+accepted as a real re-estimate.
+
+**Performance changes:** MSAA disabled (12 triangles gain nothing from it and budget GPUs pay
+full fill-rate cost), `framebufferScaleFactor` 0.8 by default, dropping automatically to 0.6 if
+measured fps stays under 14. A legible 20 fps beats a crisp 8.
+
+### The strategic finding
+
+Even with all of the above fixed, **an entry-level phone is a poor host for a browser-based
+WebXR session.** Scene Viewer is a native Android app with access to optimisations a WebGL
+canvas in Chrome cannot reach, and it will outperform our session on this class of device by a
+wide margin.
+
+That argues for **routing by device capability rather than picking one Android path**:
+
+| Device class | Path | Trade |
+|---|---|---|
+| Capable Android (S22-class and up) | RugAR session | floor lock, occlusion where depth exists |
+| Entry-level Android | Scene Viewer | usable frame rate, no lock |
+| iOS | Quick Look | ARKit's own tracking; no lock available |
+
+The honest read is that the floor lock is a **premium-device feature**. On hardware where
+ARCore itself is struggling, the right answer is not a better lock — it is handing the session
+to the platform's own optimised viewer and accepting what it gives.

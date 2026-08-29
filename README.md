@@ -77,7 +77,11 @@ For the AR itself there is no substitute for a device: plug the phone in over US
 - Height correction: 6/6 — absorbs genuine refinement at ~2 cm/s, and moves **0.00 cm** when a
   25 cm plane jump is reported.
 
-**Not verified anywhere:** the AR session itself. Nothing in a desktop browser exercises ARCore
+Device-tested on a Galaxy A17 (entry-level), which surfaced three defects — see
+`docs/ar-placement-and-scale.md` §10. Two were mine: a depth call that threw every frame
+without ever latching off, and `local-floor` never being requested as a feature.
+
+**Not fully verified:** the AR session on capable hardware. Nothing in a desktop browser exercises ARCore
 or ARKit, so the on-device behaviour of the USDZ anchoring, the floor lock and the depth
 occlusion is unproven until run on hardware. The in-AR overlay reports live diagnostics for
 exactly this reason, and a diagnostics blob is emitted to the page when a session ends.

@@ -60,6 +60,11 @@
   //   DEADBAND..JUMP_MAX   -> slew toward it at SLEW_RATE (real refinement, invisible)
   //   >= JUMP_MAX          -> reject outright (the squat/stand artefact)
   var DEADBAND = 0.01, JUMP_MAX = 0.08, SLEW_RATE = 0.02;
+  // A jump is transient. SUSTAINED disagreement is not an artefact — it is ARCore having
+  // genuinely re-estimated the floor, and refusing it forever strands the rug at a stale
+  // height. Device data showed 110 rejections against 64 corrections: the rug had stopped
+  // tracking the floor entirely. After this long in continuous disagreement, accept.
+  var RELOCK_MS = 2500;
   // Slack between the rug and the floor it lies on, so the floor cannot occlude the rug.
   var OCCL_BIAS = 0.05;
   // On merge, ARCore replaces a plane object; re-acquire only a floor this close to ours.
@@ -364,8 +369,10 @@
     // camera — which IS mid-air, by construction. Better to fail with an explanation.
     var withDepth = {
       requiredFeatures: ['hit-test'],
-      // local-floor is requested but not required — falling back to `local` is handled below.
-      optionalFeatures: ['plane-detection', 'dom-overlay', 'depth-sensing'],
+      // 'local-floor' MUST appear here to be grantable — requestReferenceSpace('local-floor')
+      // rejects outright if the feature was never requested. It was missing, which is why the
+      // A17 diagnostics reported space:"local" and the gravity-aligned space was never used.
+      optionalFeatures: ['local-floor', 'plane-detection', 'dom-overlay', 'depth-sensing'],
       depthSensing: {
         usagePreference: ['gpu-optimized'],
         dataFormatPreference: ['luminance-alpha', 'float32']
@@ -379,7 +386,7 @@
       .catch(function () {
         return navigator.xr.requestSession('immersive-ar', {
           requiredFeatures: ['hit-test'],
-          optionalFeatures: ['plane-detection', 'dom-overlay'],
+          optionalFeatures: ['local-floor', 'plane-detection', 'dom-overlay'],
           domOverlay: { root: overlay }
         });
       })
@@ -389,7 +396,9 @@
 
   function run(session, overlay, els, opts) {
     var canvas = document.createElement('canvas');
-    var glOpts = { xrCompatible: true, alpha: true, antialias: true };
+    // No antialiasing: the rug is 12 triangles, so MSAA buys nothing and costs fill rate on
+    // exactly the budget GPUs that need the headroom.
+    var glOpts = { xrCompatible: true, alpha: true, antialias: false };
     var gl = canvas.getContext('webgl2', glOpts);
     var isGL2 = !!gl;
     if (!gl) gl = canvas.getContext('webgl', glOpts);
@@ -404,14 +413,16 @@
     // The plane we have settled on, tracked across frames so corrections and merges can be
     // followed rather than ignored.
     var trackedPlane = null, stabBuf = [], lastT = 0, corrections = 0, rejects = 0;
-    var correcting = false;
+    var correcting = false, rejectSince = 0, relocks = 0;
     var candidate = null, reticle = null, twoFingerAngle = null, spaceNote = 'local';
     var statusTick = null, glBinding = null;
     var occlOn = true, debugMask = false, frames = 0, t0 = 0;
+    var depthAvailable = true, fbScale = 1;
     var diag = {
       ua: navigator.userAgent, gl: '', space: '', depth: 'unavailable', depthFmt: '',
       planes: 0, chosenArea: 0, mappedArea: 0, tiltDeg: 0, floorY: 0,
-      corrections: 0, jumpsRejected: 0, fps: 0, occlusion: 'on', notes: []
+      corrections: 0, jumpsRejected: 0, relocks: 0, fps: 0, fbScale: 1,
+      occlusion: 'on', notes: []
     };
 
     var model = new Float32Array(16);
@@ -516,10 +527,21 @@
         gl.uniformMatrix4fv(loc.uView, false, view.transform.inverse.matrix);
 
         // Depth is published per view, so it must be fetched inside this loop, not once.
+        //
+        // PERFORMANCE: this used to call getDepthInformation() every frame even after it had
+        // already thrown. On a device without depth-sensing that is a DOMException
+        // constructed, thrown, caught and string-concatenated 60x a second forever — measured
+        // at 8 fps on a Galaxy A17. One failure is enough to know; latch it off.
         var di = null;
-        if (occlOn && glBinding) {
+        if (occlOn && depthAvailable && glBinding) {
           try { di = glBinding.getDepthInformation(view); }
-          catch (e) { di = null; diag.depth = 'error: ' + (e && e.message ? e.message : e); }
+          catch (e) {
+            di = null;
+            depthAvailable = false;
+            diag.depth = 'unsupported: ' + (e && e.message ? e.message : e);
+            els.occl.textContent = 'Occlusion: n/a';
+            els.occl.disabled = true;
+          }
         }
         if (di && di.texture) {
           gl.activeTexture(gl.TEXTURE1);
@@ -611,7 +633,16 @@
       diag.tiltDeg = +tiltDeg(floorUp).toFixed(2);
       var r = correct(floorY, target, dt, correcting);
       correcting = r.correcting;
-      if (r.branch === 'rejected') { rejects++; return; }
+      if (r.branch === 'rejected') {
+        rejects++;
+        if (!rejectSince) rejectSince = t;
+        if (t - rejectSince > RELOCK_MS) {
+          floorY = target; correcting = false; rejectSince = 0;
+          relocks++; diag.relocks = relocks;
+        }
+        return;
+      }
+      rejectSince = 0;
       if (r.branch === 'slew' || r.branch === 'settled') { floorY = r.y; corrections++; }
     }
 
@@ -732,12 +763,29 @@
       lastT = t;
       frames++;
       if (!t0) t0 = t;
-      if (t - t0 > 1000) { diag.fps = Math.round(frames * 1000 / (t - t0)); frames = 0; t0 = t; }
+      if (t - t0 > 1000) {
+        diag.fps = Math.round(frames * 1000 / (t - t0));
+        frames = 0; t0 = t;
+        // Still struggling at 0.8? Drop further. A legible 20 fps beats a crisp 8.
+        if (diag.fps > 0 && diag.fps < 14 && fbScale > 0.61) {
+          fbScale = 0.6; diag.fbScale = fbScale;
+          try {
+            session.updateRenderState({
+              baseLayer: new XRWebGLLayer(session, gl, { framebufferScaleFactor: fbScale })
+            });
+            diag.notes.push('reduced framebuffer to 0.6 after ' + diag.fps + ' fps');
+          } catch (e) { /* keep rendering at the current scale */ }
+        }
+      }
       render(pose, layer, frame);
     }
 
     initGL();
-    session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+    // Render below native resolution. Phone AR is fill-rate bound and the camera feed behind
+    // the rug hides the difference; 0.8 is a standard AR default, not a compromise.
+    fbScale = 0.8;
+    session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl, { framebufferScaleFactor: fbScale }) });
+    diag.fbScale = fbScale;
     status('Starting…', '');
 
     session.addEventListener('end', function () {
@@ -776,6 +824,13 @@
       transientSource = sources[1];
       try { glBinding = new XRWebGLBinding(session, gl); }
       catch (e) { glBinding = null; diag.notes.push('XRWebGLBinding unavailable: ' + e.message); }
+      // Ask up front rather than discovering it by throwing once per frame.
+      if (session.enabledFeatures && session.enabledFeatures.indexOf('depth-sensing') < 0) {
+        depthAvailable = false;
+        diag.depth = 'not granted by session';
+        els.occl.textContent = 'Occlusion: n/a';
+        els.occl.disabled = true;
+      }
       diag.space = spaceNote;
       rescan();
       session.requestAnimationFrame(onFrame);
