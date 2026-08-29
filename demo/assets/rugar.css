@@ -1,0 +1,129 @@
+/* RugAR widget styles — self-contained, namespaced, and safe to drop onto a retailer's
+   own product page. Everything is scoped under .rugar-* so it cannot collide with the
+   host site's CSS, and nothing here restyles a host element. */
+
+.rugar-modal { position: fixed; inset: 0; z-index: 2147483000; display: none;
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1a1714; -webkit-font-smoothing: antialiased; }
+.rugar-modal.open { display: block; }
+.rugar-backdrop { position: absolute; inset: 0; background: rgba(20, 16, 12, .55); backdrop-filter: blur(3px); }
+
+.rugar-panel { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%);
+  width: min(940px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto;
+  background: #fff; border-radius: 16px; box-shadow: 0 24px 70px rgba(0,0,0,.34); }
+
+.rugar-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 20px 22px 14px; border-bottom: 1px solid #ece7e1; }
+.rugar-brand { margin: 0 0 3px; font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: #8d8378; }
+.rugar-title { margin: 0; font-size: 19px; font-weight: 620; letter-spacing: -.01em; }
+.rugar-close { border: 0; background: #f4f1ed; width: 32px; height: 32px; border-radius: 50%;
+  cursor: pointer; font-size: 13px; color: #6b6259; flex: none; }
+.rugar-close:hover { background: #e9e4dd; }
+
+.rugar-stage { padding: 18px 22px 4px; }
+
+/* ---- the room. A fixed 1600x900 design surface, uniformly scaled to fit whatever width
+   the host page gives us, so every 3D constant below is a stable design-space number
+   instead of something that has to be recomputed per breakpoint.
+
+   The floor is deliberately much larger than the frame (3600x2600) so its own edges never
+   appear — you see floor everywhere below the horizon, as in a real room. Under perspective
+   the far edge asymptotes to the horizon line and can never rise above it, so the wall is
+   painted ON TOP of the floor with its base parked just past that horizon: that overlap is
+   what produces a clean wall/floor junction instead of a visible seam. */
+.rugar-room { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden;
+  border-radius: 12px; background: #efe9e1; }
+.rugar-room-inner { position: absolute; left: 0; top: 0; width: 1600px; height: 900px;
+  transform-origin: 0 0; }
+
+.rugar-floorwrap { position: absolute; left: 0; top: 0; width: 1600px; height: 900px;
+  perspective: 1400px; perspective-origin: 50% 36%; z-index: 1; }
+.rugar-floor { position: absolute; left: -2200px; bottom: -380px; width: 6000px; height: 2600px;
+  transform-origin: 50% 100%; transform: rotateX(74deg); transform-style: preserve-3d;
+  background: #c9a980; }
+.rugar-boards { position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg, #cbac83 0 104px, #c3a077 104px 110px);
+  box-shadow: inset 0 200px 260px -120px rgba(92,62,30,.5); }
+
+.rugar-wall { position: absolute; left: 0; top: 0; width: 1600px; height: 336px; z-index: 2;
+  background: linear-gradient(#f8f5f0 0%, #ebe4da 100%); }
+.rugar-wall::after { content: ''; position: absolute; left: 0; bottom: 0; width: 100%; height: 16px;
+  background: linear-gradient(#f2ece4, #ddd3c5); border-bottom: 1px solid #cabfaf; }
+
+/* Sofa. A child of the FLOOR, so it inherits the same pixels-per-inch as the rug — an 84"
+   sofa is drawn 84" wide, and the size comparison the shopper makes is a real one.
+   The seat lies flat in the floor plane; the back hinges up out of it. rotateX(+90deg),
+   not -90: about the element's TOP edge, +90 maps local +Y onto +Z (up out of the floor),
+   while -90 sends it down THROUGH the floor. */
+.rugar-sofa { position: absolute; transform-style: preserve-3d; }
+.rugar-sofa-seat { position: absolute; inset: 0; border-radius: 10px;
+  background: linear-gradient(#9e9891, #8a847d);
+  box-shadow: 0 0 60px rgba(70,46,20,.34), inset 0 0 0 1px rgba(255,255,255,.07); }
+.rugar-sofa-seat::after { content: ''; position: absolute; inset: 8% 4%;
+  background: repeating-linear-gradient(90deg, transparent 0 32%, rgba(0,0,0,.13) 32% 33.4%); }
+.rugar-sofa-back { position: absolute; left: 0; top: 0; width: 100%;
+  transform-origin: 50% 0; transform: rotateX(90deg); border-radius: 16px 16px 4px 4px;
+  background: linear-gradient(#b6b0a9 0%, #a29c95 58%, #8d877f 100%);
+  box-shadow: inset 0 -18px 34px rgba(0,0,0,.14); }
+/* Arms, as darker uprights at each end of the back panel. They share the back's plane, which
+   from this camera angle reads correctly as the front faces of the arms. */
+.rugar-sofa-back::before, .rugar-sofa-back::after { content: ''; position: absolute; top: 6%;
+  width: 8.5%; height: 94%; background: linear-gradient(#a8a29b, #8f8982); border-radius: 12px 12px 3px 3px; }
+.rugar-sofa-back::before { left: 0; }
+.rugar-sofa-back::after { right: 0; }
+
+.rugar-rug { position: absolute; overflow: hidden;
+  box-shadow: 0 0 26px rgba(50,30,10,.34); }
+.rugar-rug-img { position: absolute; inset: 0; background-size: 100% 100%; background-position: center; }
+
+.rugar-scale-note { position: absolute; left: 0; right: 0; bottom: 10px; margin: 0; text-align: center;
+  font-size: 12.5px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.6); letter-spacing: .01em; }
+
+/* ---- controls */
+.rugar-controls { padding: 16px 22px 4px; }
+.rugar-group { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.rugar-label { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: #8d8378; flex: none; }
+.rugar-sizes { display: flex; flex-wrap: wrap; gap: 8px; }
+.rugar-chip { display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  border: 1.5px solid #ddd6cd; background: #fff; border-radius: 9px; padding: 8px 12px;
+  cursor: pointer; font: inherit; font-size: 13.5px; line-height: 1.25; color: #2c2822; transition: .13s; }
+.rugar-chip em { font-style: normal; font-size: 11.5px; color: #8d8378; }
+.rugar-chip:hover { border-color: #b9ada0; }
+.rugar-chip.active { border-color: #1f3a5f; background: #f3f6fa; }
+.rugar-chip.active em { color: #1f3a5f; }
+
+/* ---- desktop handoff. QR first and large: on a desktop there is no camera, so the only
+   useful thing this dialog can do is get the shopper onto their phone. The room render
+   below it is supporting context, never a step on the way to AR — on a phone the button
+   goes straight into AR and this dialog never opens at all. */
+.rugar-handoff { padding: 20px 22px 4px; }
+.rugar-qr { display: flex; gap: 20px; align-items: center; background: #f7f5f1;
+  border: 1px solid #ebe5dd; border-radius: 12px; padding: 18px; }
+.rugar-qr img { width: 132px; height: 132px; flex: none; border-radius: 8px; background: #fff; }
+.rugar-qr strong { display: block; font-size: 16px; font-weight: 640; }
+.rugar-qr p { margin: 4px 0 8px; font-size: 13px; color: #7d746a; }
+.rugar-qr code { display: block; font-size: 10.5px; color: #9a9086; word-break: break-all; }
+
+.rugar-stage-cap { margin: 0 0 9px; font-size: 11.5px; letter-spacing: .085em;
+  text-transform: uppercase; color: #8d8378; }
+
+/* ---- developer view: the pitch surface. Shows the exact call the PDP makes and what the
+   browser produced from it, including the zero-bytes-through-our-servers line. */
+.rugar-devtoggle { display: block; width: 100%; border: 0; border-top: 1px solid #ece7e1; background: #faf8f5;
+  padding: 10px; cursor: pointer; font: inherit; font-size: 12px; letter-spacing: .06em;
+  text-transform: uppercase; color: #8d8378; }
+.rugar-devtoggle:hover { background: #f3efe9; color: #5a5249; }
+.rugar-dev { margin: 0; padding: 16px 22px 22px; background: #14171c; color: #b9c4d2; overflow-x: auto;
+  font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word;
+  border-radius: 0 0 16px 16px; }
+
+/* The AR bridge must stay laid out (model-viewer needs a box to initialise AR), so it is
+   made invisible rather than display:none. */
+.rugar-bridge { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; bottom: 0; left: 0; }
+
+@media (max-width: 640px) {
+  .rugar-panel { inset: 0; transform: none; width: 100%; max-height: 100vh; border-radius: 0; }
+  .rugar-dev { border-radius: 0; }
+  .rugar-foot { flex-direction: column-reverse; align-items: stretch; }
+  .rugar-ar { width: 100%; padding: 16px; font-size: 16px; }
+}

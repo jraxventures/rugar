@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Aria ARA587P Rust / Blue Area Rug — RugAR Prototype</title>
+<link rel="stylesheet" href="assets/site.css">
+<link rel="stylesheet" href="assets/rugar.css">
+</head>
+<body>
+
+<div class="demo-flag">
+  <strong>RugAR prototype.</strong> A functional replica of a RugStudio product page, built to demonstrate
+  AR integration. Not affiliated with, or endorsed by, RugStudio or Safavieh. Product data and imagery
+  shown are the retailer's own, used here for evaluation.
+</div>
+
+<header class="site-head">
+  <div class="logo">Rug<span>Studio</span></div>
+  <nav class="site-nav"><span>Shop by Size</span><span>Shop by Color</span><span>Brands</span><span>Styles</span><span>Clearance</span></nav>
+</header>
+
+<p class="crumbs">Home &rsaquo; Brands &rsaquo; Safavieh &rsaquo; Aria Collection &rsaquo; ARA587P</p>
+
+<main class="pdp">
+  <div>
+    <div class="gallery-main"><img id="hero" alt="Safavieh Aria ARA587P rust and blue area rug, top-down view"></div>
+    <div class="thumbs"><div class="thumb active"><img id="thumb" alt=""></div></div>
+  </div>
+
+  <div class="buybox">
+    <h1>Safavieh Aria ARA587P Rust / Blue Area Rug</h1>
+    <p class="meta">Safavieh &nbsp;·&nbsp; Aria Collection &nbsp;·&nbsp; RugStudio #276826</p>
+
+    <div class="price"><span class="now" id="price-now">$145.00</span><span class="was" id="price-was">$151.00</span></div>
+    <p class="stock">&#10003; In stock — ships in 1–2 business days</p>
+    <div class="promo">Take an <strong>extra 20% off</strong> this rug with code <strong>SAVE20</strong></div>
+
+    <p class="field-label">Size</p>
+    <div class="sizes" id="sizes"></div>
+
+    <div class="actions">
+      <button class="btn-cart">Add to Cart</button>
+      <!-- The entire retailer-side integration: one button, one call. -->
+      <button class="btn-ar" id="ar-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/>
+          <path d="M12 8.5 16 11v4l-4 2.5L8 15v-4z"/>
+        </svg>
+        View in Your Room
+      </button>
+    </div>
+
+    <!-- Test control: swaps the iOS AR payload between our writer and model-viewer's
+         on-device conversion, so both can be compared on the same phone. -->
+    <div class="ar-engine">
+      <span class="field-label">iOS AR engine</span>
+      <div class="seg">
+        <button class="seg-btn active" data-usdz="1">RugAR USDZ</button>
+        <button class="seg-btn" data-usdz="mv">model-viewer</button>
+      </div>
+      <p class="seg-hint" id="seg-hint">Anchors to a horizontal plane and locks scale. If AR
+        misbehaves on your device, switch to model-viewer to compare.</p>
+
+      <span class="field-label" style="margin-top:16px;display:block">Android AR mode</span>
+      <div class="seg">
+        <button class="seg-btn active" data-armode="rugar">RugAR &#183; floor lock</button>
+        <button class="seg-btn" data-armode="scene-viewer">Scene Viewer</button>
+        <button class="seg-btn" data-armode="webxr">WebXR</button>
+      </div>
+      <p class="seg-hint" id="mode-hint">RugAR runs our own session: it ranks floors by area,
+        locks the height, and never lets a drag change it. No occlusion yet. Scene Viewer has
+        occlusion but cannot lock. WebXR is the original path, for comparison.</p>
+    </div>
+
+    <!-- Populated when an AR session ends. This is the data to send back after testing. -->
+    <div class="diagbox" id="diagbox" hidden>
+      <span class="field-label">AR diagnostics &mdash; from the last session</span>
+      <pre id="diagout"></pre>
+      <button id="diagcopy">Copy diagnostics</button>
+    </div>
+
+    <div class="specs">
+      <h3>Details</h3>
+      <dl>
+        <dt>Construction</dt><dd>Machine Made</dd>
+        <dt>Material</dt><dd>Polypropylene</dd>
+        <dt>Pile Thickness</dt><dd><span class="hl">approx. 1/4 inch</span> — the AR model's true depth</dd>
+        <dt>Shapes</dt><dd>Rectangle, Square, Round, Runner</dd>
+        <dt>Origin</dt><dd>Turkey</dd>
+        <dt>Style</dt><dd>Contemporary</dd>
+      </dl>
+    </div>
+  </div>
+</main>
+
+<section class="pitch">
+  <div class="pitch-in">
+    <h2>What the retailer actually integrates</h2>
+    <p class="lede">One script tag and one function call. No model pipeline, no asset uploads, no per-SKU
+      preparation — the rug photo already on their CDN is the only input. Everything below is live on this page.</p>
+
+    <div class="pitch-grid">
+      <div class="card"><div class="n" id="stat-tri">12</div><div class="k">triangles</div>
+        <div class="d">A rug is a flat extruded outline. There is no mesh to optimise, so the model pipeline that a car needs simply doesn't exist here.</div></div>
+      <div class="card"><div class="n" id="stat-ms">—</div><div class="k">ms to build the AR model</div>
+        <div class="d">Assembled in the browser, per view, from the retailer's own image bytes. Nothing is pre-baked.</div></div>
+      <div class="card"><div class="n">0</div><div class="k">image bytes through our servers</div>
+        <div class="d">The photo is fetched straight from the retailer's CDN. We never store, process, or serve it — which is why marginal cost per view rounds to zero.</div></div>
+      <div class="card"><div class="n">350k</div><div class="k">SKUs supported on day one</div>
+        <div class="d">Any SKU with a top-down photo and a size works immediately. Onboarding is not a per-SKU task.</div></div>
+    </div>
+
+<pre class="snippet"><span class="c">&lt;!-- once, in the site template --&gt;</span>
+<span class="k">&lt;script</span> src=<span class="s">"https://cdn.rugar.io/t/rugstudio/v1.js"</span> <span class="k">async&gt;&lt;/script&gt;</span>
+
+<span class="c">&lt;!-- on the product page, whenever the shopper changes size or shape --&gt;</span>
+<span class="k">RugAR</span>.configure({
+  sku:       <span class="s">"276826"</span>,
+  name:      <span class="s">"Safavieh Aria ARA587P Rust / Blue"</span>,
+  imageUrl:  <span class="s">"https://res.cloudinary.com/rugstudio-com/.../s_ara587p-5.jpg"</span>,
+  width:     <span class="s">63</span>,        <span class="c">// inches</span>
+  length:    <span class="s">91</span>,
+  shape:     <span class="s">"rectangle"</span>, <span class="c">// rectangle | square | round | runner | octagon</span>
+  thickness: <span class="s">0.25</span>       <span class="c">// inches — their own spec sheet</span>
+});</pre>
+
+    <div class="tryit">
+      <h3>Try it with any rug in their catalogue</h3>
+      <p>This is the claim worth testing live: no SKU was prepared in advance. Copy any product
+         page address from rugstudio.com, paste it here, and it becomes an AR model. A direct
+         image URL works too.</p>
+      <div class="tryit-row">
+        <input id="try-url" placeholder="https://www.rugstudio.com/safavieh-....aspx" spellcheck="false">
+        <button id="try-go">Load it</button>
+      </div>
+      <p class="note" id="try-note">Their product pages send no CORS header, so the page is read
+         server-side and the rug photo is pulled from the URL it points to.</p>
+    </div>
+  </div>
+</section>
+
+<p class="foot">RugAR prototype · built on the AR delivery stack from ripxotic · not affiliated with RugStudio or Safavieh</p>
+
+<script src="assets/rugar.js"></script>
+<script>
+(function () {
+  // Real catalogue data, read off the live ARA587P product page.
+  var IMAGE = 'https://res.cloudinary.com/rugstudio-com/image/upload/v1/files/productimages/safavieh3/s_ara587p-5.jpg';
+  var SIZES = [
+    { label: "2' x 8' Runner", width: 24,  length: 96,  shape: 'runner',    price: '69.00',  was: '115.72' },
+    { label: "5'3\" x 7'7\"",  width: 63,  length: 91,  shape: 'rectangle', price: '145.00', was: '151.00' },
+    { label: "6'7\" Square",   width: 79,  length: 79,  shape: 'square',    price: '169.00', was: '287.87' },
+    { label: "6'7\" Round",    width: 79,  length: 79,  shape: 'round',     price: '229.00', was: '299.00' },
+    { label: "8' x 10'",       width: 96,  length: 120, shape: 'rectangle', price: '334.00', was: '429.00' }
+  ];
+  var current = SIZES[1];
+  var product = { sku: '276826', name: 'Safavieh Aria ARA587P Rust / Blue', imageUrl: IMAGE };
+
+  function thumbUrl(u, w) {
+    return (window.RugAR && RugAR._internals.optimizeImageUrl(u, w, false)) || u;
+  }
+
+  function paint() {
+    document.getElementById('hero').src = thumbUrl(product.imageUrl, 900);
+    document.getElementById('thumb').src = thumbUrl(product.imageUrl, 140);
+    // A SKU resolved from a pasted URL has no pricing — their sizes and prices load
+    // client-side from Algolia, so they are not in the HTML we can read. Hide, don't invent.
+    document.getElementById('price-now').textContent = current.price ? '$' + current.price : '\u2014';
+    var was = document.getElementById('price-was');
+    was.textContent = current.was ? '$' + current.was : '';
+
+    var box = document.getElementById('sizes');
+    box.innerHTML = '';
+    SIZES.forEach(function (s) {
+      var b = document.createElement('button');
+      b.className = 'size-opt' + (s === current ? ' active' : '');
+      b.innerHTML = '<span>' + s.label + '</span>' + (s.price ? '<em>$' + s.price + '</em>' : '');
+      b.addEventListener('click', function () { current = s; paint(); push(); });
+      box.appendChild(b);
+    });
+  }
+
+  // The single integration point: hand RugAR the current selection whenever it changes.
+  function push() {
+    RugAR.configure({
+      sku: product.sku, name: product.name, brand: 'Safavieh · Aria Collection',
+      imageUrl: product.imageUrl,
+      width: current.width, length: current.length, shape: current.shape,
+      thickness: 0.25, sizes: SIZES, tenant: 'rugstudio-demo',
+      xrEngine: 'rugar',
+      // Publishes each generated GLB to a real URL. Without it Scene Viewer is unreachable,
+      // because it cannot read a blob: URL from another app.
+      assetEndpoint: '/api/asset'
+    }).then(function (stats) {
+      if (!stats) return;
+      document.getElementById('stat-tri').textContent = stats.tris;
+      document.getElementById('stat-ms').textContent = stats.buildMs;
+    });
+  }
+
+  // The whole retailer-side wiring: hand the button to RugAR. On a phone this goes
+  // straight into AR; on a desktop it offers the phone handoff.
+  document.getElementById('ar-btn').addEventListener('click', function () { RugAR.launch(); });
+
+  // The custom session reports what it actually saw — depth availability, plane count, chosen
+  // floor area, tilt, corrections applied and jumps rejected — when the session ends.
+  document.addEventListener('rugar:xr-diag', function (e) {
+    var box = document.getElementById('diagbox');
+    document.getElementById('diagout').textContent = JSON.stringify(e.detail, null, 2);
+    box.hidden = false;
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  document.getElementById('diagcopy').addEventListener('click', function () {
+    var btn = this, txt = document.getElementById('diagout').textContent;
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject())
+      .then(function () { btn.textContent = 'Copied'; })
+      .catch(function () { btn.textContent = 'Select the text above to copy'; });
+    setTimeout(function () { btn.textContent = 'Copy diagnostics'; }, 1800);
+  });
+
+  // iOS AR engine switch. Reconfigures in place — no reload — so the phone keeps its scroll
+  // position and the next tap goes straight into AR with the newly built payload.
+  document.querySelectorAll('.seg-btn[data-usdz]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var custom = b.dataset.usdz === '1';
+      document.querySelectorAll('.seg-btn[data-usdz]').forEach(function (x) { x.classList.toggle('active', x === b); });
+      document.getElementById('seg-hint').textContent = custom
+        ? 'RugAR USDZ: anchors to a horizontal plane and locks scale.'
+        : 'model-viewer: converts the GLB on-device. No plane anchoring — this is the comparison case.';
+      RugAR.configure({ customUsdz: custom });
+    });
+  });
+
+  // Android path switch. Order in ar-modes is what model-viewer honours.
+  document.querySelectorAll('.seg-btn[data-armode]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var mode = b.dataset.armode;
+      document.querySelectorAll('.seg-btn[data-armode]').forEach(function (x) { x.classList.toggle('active', x === b); });
+      document.getElementById('mode-hint').textContent =
+        mode === 'rugar'
+          ? 'RugAR: our own session. Scan the floor, tap to place, and the height is then fixed — drag and rotate cannot move it. No occlusion in this mode yet.'
+          : mode === 'scene-viewer'
+            ? "Scene Viewer: Google's AR app. Occlusion works (objects sit on the rug) but it will not lock the floor."
+            : 'WebXR via model-viewer: the original path, kept for comparison. Expect floating.';
+      RugAR.configure({
+        xrEngine: mode === 'rugar' ? 'rugar' : 'model-viewer',
+        arModes: mode === 'scene-viewer' ? 'scene-viewer webxr quick-look' : 'webxr scene-viewer quick-look'
+      });
+    });
+  });
+
+  // Keep the PDP's own size chips in step when the shopper changes size inside the widget.
+  document.addEventListener('rugar:size', function (e) {
+    var m = SIZES.filter(function (s) {
+      return s.width === e.detail.width && s.length === e.detail.length && s.shape === e.detail.shape;
+    })[0];
+    if (m) { current = m; paint(); }
+  });
+
+  // Resolve a pasted URL. A direct image link is used as-is; a product-page link has to be
+  // read server-side, because rugstudio.com serves its HTML with no CORS header (their
+  // IMAGES do send one, which is why the AR asset itself still needs no server of ours).
+  var IMG_URL = /\.(?:jpe?g|png|webp|avif)(?:[?#]|$)/i;
+
+  document.getElementById('try-go').addEventListener('click', function () {
+    var url = document.getElementById('try-url').value.trim();
+    var note = document.getElementById('try-note');
+    var go = document.getElementById('try-go');
+    if (!/^https?:\/\//i.test(url)) {
+      note.className = 'note err';
+      note.textContent = 'Paste a full https:// product page or image URL.';
+      return;
+    }
+    note.className = 'note';
+
+    if (IMG_URL.test(url)) {
+      product = { sku: 'pasted', name: 'Pasted rug', imageUrl: url };
+      paint(); push();
+      note.textContent = 'Loaded from a direct image URL. Tap \u201cView in Your Room\u201d.';
+      return;
+    }
+
+    note.textContent = 'Reading that product page\u2026';
+    go.disabled = true;
+    fetch('/api/extract?url=' + encodeURIComponent(url))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        go.disabled = false;
+        if (!d.ok) { note.className = 'note err'; note.textContent = d.error; return; }
+        product = { sku: 'resolved', name: d.name, imageUrl: d.imageUrl };
+        SIZES = d.sizes;
+        current = d.default || d.sizes[0];
+        paint(); push();
+        note.className = 'note';
+        note.textContent = d.name + ' \u2014 resolved from the page, nothing prepared in advance. '
+          + (d.sizesSource === 'fallback' ? d.note : '');
+      })
+      .catch(function (e) {
+        go.disabled = false;
+        note.className = 'note err';
+        note.textContent = 'Could not reach the resolver: ' + e.message;
+      });
+  });
+
+  paint(); push();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# OS / editor
+.DS_Store
+*.swp
+
+# Local scratch
+*.log
+node_modules/
+
+# dist/ IS committed on purpose — see README. This repo has no build tooling of its
+# own (esbuild is borrowed from the sibling ripxotic-site checkout), so a fresh clone
+# could not otherwise reproduce the deployable demo.

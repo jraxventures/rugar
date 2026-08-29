@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RugAR — floor logic simulator</title>
+<style>
+  :root{--bg:#0f1216;--card:#171b22;--rule:#262c36;--ink:#e8ecf2;--mut:#98a2b0;
+        --ok:#63b394;--bad:#e0765e;--acc:#7e9bd8}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:28px 20px 70px}
+  h1{font-size:23px;margin:0 0 6px;letter-spacing:-.02em}
+  .lede{color:var(--mut);margin:0 0 26px;max-width:70ch}
+  h2{font-size:15px;margin:30px 0 10px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:16px 18px;margin-bottom:12px}
+  .row{display:flex;gap:12px;align-items:baseline}
+  .tag{font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;padding:5px 8px;border-radius:4px;flex:none}
+  .pass{background:rgba(99,179,148,.16);color:var(--ok)} .fail{background:rgba(224,118,94,.16);color:var(--bad)}
+  .det{color:var(--mut);font:12.5px/1.6 ui-monospace,Menlo,monospace;margin-top:6px;white-space:pre-wrap}
+  canvas{width:100%;height:230px;background:#0b0e12;border:1px solid var(--rule);border-radius:10px;display:block}
+  .key{display:flex;gap:18px;flex-wrap:wrap;color:var(--mut);font-size:12.5px;margin-top:10px}
+  .key i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  .sum{font:600 15px/1 ui-monospace,Menlo,monospace;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>RugAR floor logic simulator</h1>
+  <p class="lede">Runs the real floor-selection and height-correction code from
+    <code>rugar-xr.js</code> against scripted scenarios — including the two failures seen on the
+    Galaxy S22 Ultra. No phone, no AR, no ARCore: this exercises the decision logic only, which
+    is the part that was getting them wrong. Open it in any browser.</p>
+
+  <h2>Floor selection</h2>
+  <div id="floor"></div>
+
+  <h2>Height correction over time</h2>
+  <canvas id="plot" width="1720" height="460"></canvas>
+  <div class="key">
+    <span><i style="background:#7e9bd8"></i>reported floor height</span>
+    <span><i style="background:#63b394"></i>rug height (what the shopper sees)</span>
+    <span><i style="background:#e0765e"></i>rejected as a jump</span>
+  </div>
+  <div id="corr"></div>
+  <p class="sum" id="sum"></p>
+</div>
+
+<script src="assets/rugar-xr.js"></script>
+<script>
+(function () {
+  var X = window.RugARXR, pass = 0, total = 0;
+
+  function card(host, ok, title, detail) {
+    total++; if (ok) pass++;
+    var d = document.createElement('div');
+    d.className = 'card';
+    d.innerHTML = '<div class="row"><span class="tag ' + (ok ? 'pass">PASS' : 'fail">FAIL') +
+      '</span><strong>' + title + '</strong></div><div class="det">' + detail + '</div>';
+    host.appendChild(d);
+  }
+
+  // ---- floor selection, driven through the real pickFloor -------------------
+  var sq = function (s) { var h = s / 2; return [{x:-h,z:-h},{x:h,z:-h},{x:h,z:h},{x:-h,z:h}]; };
+  var mat = function (y) { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,y,0,1]); };
+  function P(name, side, y, orient) {
+    var p = { name: name, orientation: orient || 'horizontal', polygon: sq(side), __y: y };
+    p.planeSpace = p; return p;
+  }
+  function frameOf(ps) {
+    return { detectedPlanes: { forEach: function (f) { ps.forEach(f); } },
+             getPose: function (sp) { return { transform: { position:{y:sp.__y}, matrix: mat(sp.__y) } }; } };
+  }
+  var host = document.getElementById('floor');
+  [
+    ['Pillar moulding must not win over the floor',
+     [P('floor',3.46,0), P('sofa',1.10,0.42), P('coffee table',0.71,0.38), P('pillar moulding',0.28,0.25)], 'floor'],
+    ['A spurious sliver BELOW the floor must not win — "lowest wins" fails here',
+     [P('floor',3.46,0), P('bad sliver',0.30,-0.15)], 'floor'],
+    ['Floor split into two patches — tie-break takes the lower',
+     [P('patch hi',2.45,0.03), P('patch lo',2.41,0.00)], 'patch lo'],
+    ['Only furniture visible — must keep scanning, not place',
+     [P('sofa',1.10,0.42), P('moulding',0.28,0.25)], null],
+    ['Dining table is large but the floor is larger',
+     [P('dining table',1.30,0.74), P('floor',3.0,0.00)], 'floor']
+  ].forEach(function (c) {
+    var got = X._pickFloor(frameOf(c[1]), null, 1.5);
+    var name = got ? (c[1].filter(function (p) { return Math.abs(p.__y - got.y) < 1e-9; })[0] || {}).name : null;
+    var areas = c[1].map(function (p) {
+      return '  ' + (p.name + '            ').slice(0,16) + X._area(p.polygon).toFixed(2) + ' m²  y=' + p.__y.toFixed(2);
+    }).join('\n');
+    card(host, name === c[2], c[0],
+      areas + '\n  -> chose: ' + (name || 'nothing (keeps scanning)') +
+      '   expected: ' + (c[2] || 'nothing'));
+  });
+
+  // ---- height correction ---------------------------------------------------
+  var DT = 1/30, SECS = 12, N = Math.round(SECS/DT);
+  // Scripted floor readings: settles, gets refined 4cm, then a squat/stand throws a 25cm jump.
+  function reported(t) {
+    if (t < 3)  return 0.00 + 0.003 * Math.sin(t * 30);   // noise around a good estimate
+    if (t < 6)  return 0.04;                              // genuine refinement
+    if (t < 8)  return 0.29;                              // squat/stand artefact
+    return 0.04;                                          // recovers
+  }
+  var ys = [], rep = [], rej = [], y = 0, correcting = false, nRej = 0, nCor = 0;
+  for (var i = 0; i < N; i++) {
+    var t = i * DT, target = reported(t);
+    var r = X._correct(y, target, DT, correcting);
+    correcting = r.correcting;
+    if (r.branch === 'rejected') nRej++;
+    if (r.branch === 'slew' || r.branch === 'settled') nCor++;
+    y = r.y; ys.push(y); rep.push(target); rej.push(r.branch === 'rejected');
+  }
+  // The meaningful question is NOT "how close is the rug to the reported height at every
+  // instant" — during a deliberate 2 cm/s slew it is legitimately behind, and measuring that
+  // as error just flags correct behaviour. What matters is whether the rug FOLLOWS THE JUMP.
+  var jumpDev = 0;
+  for (var k = 0; k < N; k++) {
+    var tk = k * DT;
+    if (tk >= 6 && tk <= 8) { var d = Math.abs(ys[k] - 0.04); if (d > jumpDev) jumpDev = d; }
+  }
+  var endDev = Math.abs(ys[N - 1] - 0.04);
+
+  var cv = document.getElementById('plot'), g = cv.getContext('2d');
+  var W = cv.width, H = cv.height, PAD = 34;
+  var lo = -0.02, hi = 0.32;
+  var px = function (i) { return PAD + (i / (N - 1)) * (W - PAD * 2); };
+  var py = function (v) { return H - PAD - ((v - lo) / (hi - lo)) * (H - PAD * 2); };
+  g.fillStyle = '#0b0e12'; g.fillRect(0, 0, W, H);
+  g.strokeStyle = '#1e242c'; g.lineWidth = 2;
+  [0, 0.1, 0.2, 0.3].forEach(function (v) {
+    g.beginPath(); g.moveTo(PAD, py(v)); g.lineTo(W - PAD, py(v)); g.stroke();
+    g.fillStyle = '#5d6b7d'; g.font = '20px ui-monospace,Menlo,monospace';
+    g.fillText((v * 100).toFixed(0) + ' cm', 4, py(v) + 7);
+  });
+  for (var j = 0; j < N; j++) if (rej[j]) { g.fillStyle = 'rgba(224,118,94,.20)'; g.fillRect(px(j), PAD, (W - PAD*2)/N + 1, H - PAD*2); }
+  function line(arr, col, w) {
+    g.beginPath(); g.strokeStyle = col; g.lineWidth = w;
+    for (var i2 = 0; i2 < arr.length; i2++) { var X2 = px(i2), Y2 = py(arr[i2]); i2 ? g.lineTo(X2, Y2) : g.moveTo(X2, Y2); }
+    g.stroke();
+  }
+  line(rep, '#7e9bd8', 3);
+  line(ys, '#63b394', 5);
+
+  card(document.getElementById('corr'), jumpDev < 0.01 && endDev < 0.005 && nRej > 0,
+    'Rug height never follows the squat/stand jump',
+    '  noise 0-3 s        ignored — rug stays flat on the floor\n' +
+    '  refinement 3-6 s   absorbed at ~2 cm/s (' + nCor + ' corrections)\n' +
+    '  JUMP 6-8 s         ' + nRej + ' frames rejected · rug moved ' +
+      (jumpDev * 100).toFixed(2) + ' cm (a 25 cm jump was reported)\n' +
+    '  settled at 12 s    ' + (endDev * 100).toFixed(2) + ' cm from the true floor');
+
+  document.getElementById('sum').textContent = pass + ' / ' + total + ' checks passed';
+  document.getElementById('sum').style.color = pass === total ? '#63b394' : '#e0765e';
+})();
+</script>
+</body>
+</html>
