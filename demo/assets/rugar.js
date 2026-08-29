@@ -623,6 +623,8 @@
       // model-viewer module has necessarily been upgraded, and a property assigned to a
       // not-yet-upgraded custom element shadows the accessor it is meant to drive.
       state.hostedUrl = null;
+      state.hostedFailed = false;
+      applyArModes();                     // demote Scene Viewer until the new upload lands
       publishGlb(glb, seq);
       if (mv) {
         mv.setAttribute('src', state.blobUrl);
@@ -670,9 +672,17 @@
       u.searchParams.set('disable_occlusion', wantOccl ? 'false' : 'true');
       state.hostedUrl = u.toString();
       if (els.mv) els.mv.setAttribute('src', state.hostedUrl);
+      applyArModes();                     // Scene Viewer may now be promoted to first
+      notify('ready');
       if (state.stats) state.stats.hostedUrl = state.hostedUrl;
       renderDevPanel();
-    }).catch(function () { /* Scene Viewer stays unavailable; WebXR is unaffected */ });
+    }).catch(function () {
+      // Upload failed: Scene Viewer can never work this session. Say so and stop waiting on it,
+      // rather than leaving the button blocked forever.
+      state.hostedFailed = true;
+      applyArModes();
+      notify('ready');
+    });
   }
 
   /**
@@ -804,7 +814,7 @@ var STAGE_W = 1600;
     if (els.mv) return;
     var mv = document.createElement('model-viewer');
     mv.setAttribute('ar', '');
-    mv.setAttribute('ar-modes', CFG.arModes);
+    mv.setAttribute('ar-modes', effectiveArModes());
     mv.setAttribute('ar-placement', 'floor');
     mv.setAttribute('ar-scale', 'fixed');   // a rug has ONE true size; never let AR resize it
     mv.setAttribute('shadow-intensity', '1');
@@ -823,6 +833,41 @@ var STAGE_W = 1600;
     return !!(els.mv && els.mv.canActivateAR && state.blobUrl);
   }
 
+  /** True when the caller asked for Scene Viewer ahead of WebXR. */
+  function svPreferred() {
+    return CFG.arModes.indexOf('scene-viewer') === 0;
+  }
+
+  /**
+   * Scene Viewer runs in a SEPARATE Android app and is handed the model as `&file=<url>`. It
+   * cannot read a blob: URL — it launches, sits on its loading screen, and never resolves.
+   * The GLB is uploaded asynchronously, so for the first second or two after load there is no
+   * https URL yet.
+   *
+   * Until one exists, keep WebXR first so a tap can never reach a Scene Viewer that is
+   * guaranteed to hang. If the upload failed outright, stay on WebXR permanently.
+   */
+  function effectiveArModes() {
+    return pickArModes(CFG.arModes, state.hostedUrl, state.hostedFailed);
+  }
+
+  /** Pure form, so the rule can be tested rather than only observed in a live session. */
+  function pickArModes(requested, hostedUrl, hostedFailed) {
+    var wantsSV = requested.indexOf('scene-viewer') === 0;
+    if (wantsSV && !hostedUrl && !hostedFailed) return 'webxr scene-viewer quick-look';
+    if (wantsSV && hostedFailed) return 'webxr scene-viewer quick-look';
+    return requested;
+  }
+
+  /** Pure form of the launch guard: true means "do not launch yet, it would hang". */
+  function shouldBlockLaunch(requested, hostedUrl, hostedFailed) {
+    return requested.indexOf('scene-viewer') === 0 && !hostedUrl && !hostedFailed;
+  }
+
+  function applyArModes() {
+    if (els.mv) els.mv.setAttribute('ar-modes', effectiveArModes());
+  }
+
   /**
    * The button's whole job: on a phone, go straight into AR. No preview, no dialog, no
    * intermediate step. The desktop path exists only because a desktop has no camera —
@@ -830,6 +875,13 @@ var STAGE_W = 1600;
    */
   function launch() {
     report('ar_activate');
+    // Asked for Scene Viewer but the model has no real URL yet: launching now would strand the
+    // user on Scene Viewer's loading screen. Better to say "one moment" for the second it takes.
+    if (IS_MOBILE && shouldBlockLaunch(CFG.arModes, state.hostedUrl, state.hostedFailed)) {
+      notify('preparing');
+      document.dispatchEvent(new CustomEvent('rugar:sv-pending'));
+      return;
+    }
     // Our own session first when selected. Called synchronously so requestSession() still sees
     // the user activation from this click.
     if (IS_MOBILE && CFG.xrEngine === 'rugar' && xrReady()) {
@@ -1013,7 +1065,7 @@ var STAGE_W = 1600;
 
   function configure(opts) {
     for (var k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) CFG[k] = opts[k];
-    if (els.mv && els.mv.getAttribute('ar-modes') !== CFG.arModes) els.mv.setAttribute('ar-modes', CFG.arModes);
+    applyArModes();
     if (opts && opts.size) {
       var p = parseSize(opts.size, opts.shape);
       if (p) { CFG.width = p.width; CFG.length = p.length; CFG.shape = p.shape; }
@@ -1055,7 +1107,7 @@ var STAGE_W = 1600;
     open: openHandoff,
     close: close,
     isMobile: function () { return IS_MOBILE; },
-    _internals: { parseSize: parseSize, buildGeometry: buildGeometry, buildGlb: buildGlb, buildUsdz: buildUsdz, optimizeImageUrl: optimizeImageUrl, formatSize: formatSize }
+    _internals: { pickArModes: pickArModes, shouldBlockLaunch: shouldBlockLaunch, parseSize: parseSize, buildGeometry: buildGeometry, buildGlb: buildGlb, buildUsdz: buildUsdz, optimizeImageUrl: optimizeImageUrl, formatSize: formatSize }
   };
 
   // Auto-init from a data-attribute snippet, so a retailer can integrate without writing JS.

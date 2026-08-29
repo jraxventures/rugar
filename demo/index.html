@@ -216,7 +216,17 @@
 
   // The whole retailer-side wiring: hand the button to RugAR. On a phone this goes
   // straight into AR; on a desktop it offers the phone handoff.
-  document.getElementById('ar-btn').addEventListener('click', function () { RugAR.launch(); });
+  var arBtn = document.getElementById('ar-btn');
+  var arLabel = arBtn.lastChild;
+  arBtn.addEventListener('click', function () { RugAR.launch(); });
+
+  // Scene Viewer needs the model at a real URL; the upload takes about a second after any
+  // size change. Rather than a tap that appears to do nothing (or worse, strands the user on
+  // Scene Viewer's loading screen), say what is happening.
+  document.addEventListener('rugar:sv-pending', function () {
+    arLabel.nodeValue = ' Preparing\u2026 tap again';
+    setTimeout(function () { arLabel.nodeValue = ' View in Your Room'; }, 1600);
+  });
 
   // The custom session reports what it actually saw — depth availability, plane count, chosen
   // floor area, tilt, corrections applied and jumps rejected — when the session ends.
